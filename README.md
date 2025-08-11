@@ -1,7 +1,9 @@
-Fun project to workout my Python and SQL muscles!
+Midi Genarator Project
 
-I enjoy making music and I wanted to combine my interests to create a fun
-summer project!
+A Python-based MIDI generator that creates melodies based on a selected mood and level of randomness, 
+producing unique MIDI clips on demand.
 
-p.s. -> this is my first time doing the version control stuff with Git so
-        don't expect a lot XD
+Built to demonstrate my ability to work with Python, design functional utilities, 
+and manage code using GitHub.
+
+Enjoy!
