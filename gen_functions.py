@@ -1,6 +1,3 @@
-from mido import *
-import random, mood_preset
-
 from mido import MidiFile, MidiTrack, Message
 import random
 import mood_preset
@@ -31,28 +28,34 @@ def generate_melody(scale, rhythm, randomness, bars):
     return notes
 
 def add_chords(notes, scale):
+    """Add chord accompaniment to melody notes"""
     chord_notes = []
+    
     for note, duration, velocity in notes:
-        chord = [note]
-
-        index = scale.index(note)
-        if index + 2 < len(scale):
-            chord.append(scale[index + 2])  # third
-            if index + 4 < len(scale):
-                chord.append(scale[index + 4])  # fifth
-        for pitch in chord:
-            chord_notes.append((pitch, duration, velocity))
+        # Add the original melody note
+        chord_notes.append((note, duration, velocity))
+        
+        # Find the note in the scale
+        try:
+            base_index = scale.index(note)
+        except ValueError:
+            # If note not in scale, just add melody note
+            continue
+            
+        # Create chord by adding third and fifth intervals
+        # Use modulo to wrap around the scale
+        third_index = (base_index + 2) % len(scale)
+        fifth_index = (base_index + 4) % len(scale)
+        
+        third_note = scale[third_index]
+        fifth_note = scale[fifth_index]
+        
+        # Add chord notes with slightly lower velocity
+        chord_velocity = max(30, velocity - 20)
+        chord_notes.append((third_note, duration, chord_velocity))
+        chord_notes.append((fifth_note, duration, chord_velocity))
 
     return chord_notes
-
-def add_pauses(notes, pause_chance=0.2):
-    final = []
-    for note in notes:
-        if random.random() < pause_chance:
-            final.append(None) # pause
-        else:
-            final.append(note)
-    return final
 
 def write_to_midi(notes, filename):
     mid = MidiFile()
@@ -60,16 +63,34 @@ def write_to_midi(notes, filename):
     mid.tracks.append(track)
     track.append(Message('program_change', program=12, time=0))
 
-    for note_data in notes:
-        if note_data is None:
-            continue  # pause
-        note, duration, velocity = note_data
-        track.append(Message('note_on', note=note, velocity=velocity, time=0))
-        track.append(Message('note_off', note=note, velocity=velocity, time=duration))
+    i = 0
+    while i < len(notes):
+        if notes[i] is None:
+            # Insert a rest by delaying the next note
+            track.append(Message('note_off', note=0, velocity=0, time=240))
+            i += 1
+            continue
 
+        # Gather all notes that start at the same time (i.e., a chord)
+        current_group = []
+        duration = notes[i][1]
+        velocity = notes[i][2]
+
+        while i < len(notes) and notes[i] is not None and notes[i][1] == duration and notes[i][2] == velocity:
+            current_group.append(notes[i][0])  # just the note
+            i += 1
+
+        # Play all chord notes simultaneously
+        for note in current_group:
+            track.append(Message('note_on', note=note, velocity=velocity, time=0))
+
+        # Turn them all off after duration
+        for note in current_group:
+            track.append(Message('note_off', note=note, velocity=velocity, time=duration))
+    
     mid.save(filename)
 
-def create_simple_melody(filename, mood, randomness, bar_length, chords, pauses):
+def create_simple_melody(filename, mood, randomness, bar_length, chords):
     # Validation
     if mood not in mood_preset.mood_setting:
         raise ValueError("Invalid mood.")
@@ -84,8 +105,9 @@ def create_simple_melody(filename, mood, randomness, bar_length, chords, pauses)
     if chords:
         notes = add_chords(notes, scale)
 
-    if pauses:
-        notes = add_pauses(notes)
+    write_to_midi(notes, filename)
+
+    print(f"MIDI saved as {filename} | Mood: {mood} | Randomness: {randomness} | Bars: {bar_length} | Chords: {chords}")
 
     write_to_midi(notes, filename)
 
